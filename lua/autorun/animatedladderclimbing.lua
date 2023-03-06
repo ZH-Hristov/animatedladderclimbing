@@ -1,4 +1,5 @@
 local CamEnabled = CreateClientConVar( "ALC_ClimbCam", 1, true, false, "Sets whether climbing should use a custom camera. Requres CVPS installed.", 0, 1 )
+local HolsterEnabled = CreateConVar("ALC_HolsterWeapon", 1, bit.band(FCVAR_REPLICATED, FCVAR_ARCHIVE), "Sets whether the weapon should be holstered and re-equipped on ladder mount/dismount.", 0, 1)
 
 local PlyMethods = FindMetaTable("Player")
 local ALC_ClimbSeqDuration = 2.0333333015442
@@ -118,8 +119,15 @@ end
 local function AddClimber(ply)
     if table.IsEmpty(Climbers) then
         hook.Add("CalcMainActivity", "ALC_CalcMainActivity", CalcMainHook)
+
         hook.Add("PlayerSwitchWeapon", "ALC_DisallowWeaponChange", function(ply)
             if ply:GetNW2Bool("ALC_CLIMBING") then return true end
+        end)
+
+        hook.Add("UpdateAnimation", "ALC_SetYaw", function(ply)
+            if ply:GetNW2Float("ALC_LookAtYaw", nil) then
+                ply:SetRenderAngles(Angle(0, ply:GetNW2Float("ALC_LookAtYaw"), 0))
+            end
         end)
     end
 
@@ -133,6 +141,7 @@ local function RemoveClimber(ply)
     if table.IsEmpty(Climbers) then
         hook.Remove("CalcMainActivity", "ALC_CalcMainActivity")
         hook.Remove("PlayerSwitchWeapon", "ALC_DisallowWeaponChange")
+        hook.Remove("UpdateAnimation", "ALC_SetYaw")
     end
 end
 
@@ -147,8 +156,10 @@ function PlyMethods:InitStickyLadder(Ladder)
 
     local tr = util.TraceLine( {start = Ladder:GetPos(), endpos = Ladder:GetPos() + keyvals.point0, mask = 0} )
 
-    self.ALC_LastWeapon = self:GetActiveWeapon()
-    self:SetActiveWeapon(nil)
+    if HolsterEnabled:GetBool() then
+        self.ALC_LastWeapon = self:GetActiveWeapon()
+        self:SetActiveWeapon(nil)
+    end
 
     self:SetNW2Bool("ALC_Climbing", true)
 
@@ -218,20 +229,6 @@ hook.Add("EntityNetworkedVarChanged", "ALC_NWVarChanged", function(ent, varname,
             AddClimber(ent)
 
             if CLIENT and ent == LocalPlayer() then
-                hook.Add("InputMouseApply", "ALC_ForceLook", function( ccmd, x, y, angle )
-                    angle.pitch = math.Clamp( angle.pitch + y / 50, -89, 89 )
-
-                    local diff = angNorm(LocalPlayer():GetNW2Float("ALC_LookAtYaw") - angle.yaw)
-                    if diff < 0 then
-                        angle:RotateAroundAxis(Vector(0, 0, 1), Lerp(0.95, diff, 0))
-                    elseif diff > 0 then
-                        angle:RotateAroundAxis(Vector(0, 0, 1), Lerp(0.95, diff, 0))
-                    end
-                    
-                    ccmd:SetViewAngles(angle)
-                    return true
-                end)
-
                 if !CalcViewPS or !CamEnabled:GetBool() then return end
                 local attId = LocalPlayer():LookupAttachment("eyes")
                 if attId <= 0 then return end
