@@ -186,9 +186,8 @@ function PlyMethods:DeInitStickyLadder()
     self:SetNW2Float("ALC_LadderEndHeight", nil)
     self:SetNW2Float("ALC_LadderPitch", nil)
 
-    timer.Simple(0.1, function()
-        self:SetNW2Float("ALC_LookAtYaw", nil) -- This is delayed otherwise the view angles snap when getting off the ladder
-    end)
+
+    self:SetNW2Float("ALC_LookAtYaw", nil)
 end
 
 if SERVER then
